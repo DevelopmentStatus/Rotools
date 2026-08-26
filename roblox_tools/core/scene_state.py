@@ -6,8 +6,12 @@ off - not how the user likes the tool to feel.
 
 `rotools_orientation` and `rotools_pivot_mode` are deliberately *shared* across
 Move / Scale / Rotate rather than per-tool: Roblox Studio has one Local-space
-toggle in the Model tab that every transform tool obeys, and the swivel pivot
-would be useless if switching tools dropped it.
+toggle in the Model tab that every transform tool obeys.
+
+The swivel point itself (`rotools_swivel_*`) is the one exception: it can only
+be picked while Rotate is active, and `ui/overlay.py` drops it on any tool
+change, so it never survives into Move/Scale/Select - see
+`operators/set_swivel.py`.
 """
 
 import bpy
@@ -49,6 +53,11 @@ SCALE_PIVOT_ITEMS = (
 # this value gets nudged to Roblox's 15 degrees - see _set_default_rotate_increment.
 BLENDER_DEFAULT_ANGLE_INCREMENT = radians(5)
 ROBLOX_ANGLE_INCREMENT = radians(15)
+
+# Names of scenes this addon nudged from the Blender default to the Roblox one,
+# so unregister() can revert exactly those - not scenes the user set to 15
+# degrees themselves. See _set_default_rotate_increment / unregister.
+_nudged_scene_names = set()
 
 
 # --- transform-snap proxies -------------------------------------------------
@@ -203,6 +212,7 @@ def _set_default_rotate_increment():
         ts = scene.tool_settings
         if abs(ts.snap_angle_increment_3d - BLENDER_DEFAULT_ANGLE_INCREMENT) < 1e-6:
             ts.snap_angle_increment_3d = ROBLOX_ANGLE_INCREMENT
+            _nudged_scene_names.add(scene.name)
 
 
 def unregister():
@@ -211,6 +221,17 @@ def unregister():
     # callback queued against the dead module.
     if bpy.app.timers.is_registered(_set_default_rotate_increment):
         bpy.app.timers.unregister(_set_default_rotate_increment)
+
+    # Revert only the scenes this addon actually nudged, and only if nothing
+    # has changed the value since - a scene the user re-set to 15 degrees
+    # themselves after the nudge is left alone.
+    for scene in bpy.data.scenes:
+        if scene.name not in _nudged_scene_names:
+            continue
+        ts = scene.tool_settings
+        if abs(ts.snap_angle_increment_3d - ROBLOX_ANGLE_INCREMENT) < 1e-6:
+            ts.snap_angle_increment_3d = BLENDER_DEFAULT_ANGLE_INCREMENT
+    _nudged_scene_names.clear()
 
     del bpy.types.Scene.rotools_orientation
     del bpy.types.Scene.rotools_pivot_mode

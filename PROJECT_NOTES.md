@@ -4,6 +4,55 @@ Running log of decisions, gotchas, and in-progress work for RoTools. Newest
 entries at the top. This is the project's persistent memory since there is
 no git history to consult.
 
+## 2026-08-26 — Verified duplicate/swivel rescope, fixed the rotate-increment leak
+
+**Verified the uncommitted duplicate + swivel-rescope change.** Working tree
+had `operators/duplicate.py` (new, untracked) plus edits to `__init__.py`,
+`keymaps.py`, `scene_state.py`, `set_swivel.py`, all three transform tools,
+`overlay.py`, and `tool_ui.py`, with no PROJECT_NOTES entry. Reloaded from the
+repo (disable → purge `sys.modules` → enable) and checked the resolved addon
+keyconfig plus operator `poll()`/state logic directly, since the Blender MCP
+tools here have no mouse/keyboard input into the 3D viewport (unlike the
+browser tools) — a real click-drag Ctrl+D test still needs a human:
+
+- Keymap: `V` (`rotools.set_swivel`) now lives only in Rotate's tool keymap;
+  Select/Move/Scale/Rotate all bind `Ctrl+D` → `rotools.duplicate`. Matches
+  the diff exactly, confirmed by walking `wm.keyconfigs.addon.keymaps`.
+- `ROTOOLS_OT_set_swivel.poll` is `True` only with Rotate active, `False` on
+  Move/Select (`wm.tool_set_by_id` needs a real `temp_override(area=<VIEW_3D>,
+  region=<WINDOW>)` — without it the call silently no-ops with "Tool cannot be
+  set with an empty space" and any poll check downstream is meaningless).
+- `_duplicate_objects` (in `operators/duplicate.py`) gives each copy its own
+  mesh data (not shared with the original) and re-points a copied child's
+  parent at the copied parent, not the original — mirrors `drag.py`'s
+  `_stamp` as the docstring claims.
+- `overlay._clear_swivel_on_tool_change` does drop a swivel set while on
+  Rotate the moment the active tool changes: `rotools_swivel_is_set` → False,
+  kind cleared, `rotools_pivot_mode` falls back to CENTER. Verified by
+  forcing the module's `_last_tool_idname` to Rotate, setting a swivel by
+  hand, switching tool, and calling the handler directly.
+
+Not yet verified: an actual Ctrl+D press with the cursor over a surface,
+confirming the copy drags/snaps/rests like a normal drag and falls back to
+`object.duplicate_move` over empty space. Needs a human at the keyboard.
+
+**Fixed: the 15° rotate increment was never reverted on addon disable**
+(`docs/11-known-gaps.md` §11.3). `_set_default_rotate_increment` nudges a
+scene from Blender's 5° default to Roblox's 15° but nothing undid that on
+`unregister()`, so disabling the addon left 15° behind. Fixed by recording
+which scenes were actually nudged (`_nudged_scene_names`, module-level) and,
+on `unregister()`, reverting only those scenes and only if the value is still
+exactly what the nudge set it to — a scene the user deliberately changed
+since (verified with a manual set to 30°) is left alone. Verified end to end
+in live Blender: 5°→enable→15°, disable→5°; separately, 5°→enable→15°→user
+sets 30°→disable→still 30°.
+
+Left alone (per CLAUDE.md, only fix what's asked): the rest of
+`docs/11-known-gaps.md` §11.3–11.5, since most of it is documented tradeoffs
+(swivel not tracking picked geometry, sheared-object gizmo basis) rather than
+bugs, and the remainder (4.0-support claim, no test suite, overlay redraw
+scope) is unconfirmed or cosmetic.
+
 ## 2026-08-25 — Rotate ring sizing and the half-drawn rings
 
 **The rings were sized by the bounding *sphere*, and that is the wrong solid.**
