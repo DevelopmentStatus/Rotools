@@ -46,6 +46,7 @@ class ROTOOLS_GGT_scale(bpy.types.GizmoGroup):
         gz = style_handle(self.gizmos.new("GIZMO_GT_arrow_3d"), AXIS_COLORS[axis])
         gz.draw_style = 'BOX'
         gz.length = HANDLE_GAP
+        gz.scale_basis = 1.0
 
         op = gz.target_set_operator("transform.resize")
         op.release_confirm = True
@@ -81,6 +82,14 @@ class ROTOOLS_GGT_scale(bpy.types.GizmoGroup):
         # (not a fixed distance from the pivot, so they track the object's real size)
         # and reach HANDLE_GAP beyond it via the arrow's own length.
         for (axis, sign), gz in self.axis_gizmos.items():
+            op = self.axis_ops[(axis, sign)]
+            op.orient_type = orient_type
+            if gz.is_modal:
+                # Leave a handle's matrix and anchor alone while it is being
+                # dragged - Blender is already driving it interactively, and
+                # recomputing either out from under that fights the drag.
+                continue
+
             i = AXIS_INDEX[axis]
             scalars = list(mid)
             scalars[i] = bounds[sign][i]
@@ -88,8 +97,6 @@ class ROTOOLS_GGT_scale(bpy.types.GizmoGroup):
             rot = axis_rotations[axis] if sign == 1 else axis_rotations[axis] @ FLIP_ROTATION
             gz.matrix_basis = Matrix.Translation(handle_pos) @ rot
 
-            op = self.axis_ops[(axis, sign)]
-            op.orient_type = orient_type
             if use_opposite_face:
                 # Anchor at the face on the opposite side from the handle being dragged.
                 anchor = list(mid)

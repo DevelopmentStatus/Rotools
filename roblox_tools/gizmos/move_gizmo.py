@@ -49,6 +49,7 @@ class ROTOOLS_GGT_move(bpy.types.GizmoGroup):
         gz = style_handle(self.gizmos.new("GIZMO_GT_arrow_3d"), AXIS_COLORS[axis])
         gz.draw_style = 'NORMAL'
         gz.length = ARROW_LENGTH
+        gz.scale_basis = 1.0
 
         op = gz.target_set_operator("transform.translate")
         op.release_confirm = True
@@ -99,10 +100,15 @@ class ROTOOLS_GGT_move(bpy.types.GizmoGroup):
                 face_positions[(axis, sign)] = point_from_local(rotation_3x3, *scalars)
 
         for (axis, sign), gz in self.axis_gizmos.items():
+            self.axis_ops[(axis, sign)].orient_type = orient_type
+            if gz.is_modal:
+                # Leave a handle's own matrix alone while it is being dragged -
+                # Blender is already driving it interactively, and overwriting
+                # matrix_basis out from under that fights the drag.
+                continue
             position = pivot if face_positions is None else face_positions[(axis, sign)]
             rot = axis_rotations[axis] if sign == 1 else axis_rotations[axis] @ FLIP_ROTATION
             gz.matrix_basis = Matrix.Translation(position) @ rot
-            self.axis_ops[(axis, sign)].orient_type = orient_type
 
         self.center_gizmo.matrix_basis = Matrix.Translation(pivot)
         self.center_op.orient_type = orient_type
