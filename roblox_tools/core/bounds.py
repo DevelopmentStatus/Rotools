@@ -1,3 +1,4 @@
+import bmesh
 from mathutils import Matrix, Vector
 
 AXIS_INDEX = {'X': 0, 'Y': 1, 'Z': 2}
@@ -23,21 +24,62 @@ def world_corners(objects):
             yield mw @ Vector(corner)
 
 
-def local_aabb(objects, rotation_3x3):
-    """Axis-aligned bounds (in the given local frame) of all objects' world-space
-    bounding-box corners. Returns (mins, maxs), each a 3-tuple of scalar projections
-    onto the local X/Y/Z axes."""
+def local_aabb_from_points(points, rotation_3x3):
+    """Axis-aligned bounds (in the given local frame) of `points`. Returns
+    (mins, maxs), each a 3-tuple of scalar projections onto the local X/Y/Z
+    axes, or None if `points` is empty.
+
+    The shared plumbing both Object Mode (`local_aabb`, corners of whole
+    objects) and Edit Mesh (`edit_mesh_local_aabb`, corners of a bmesh
+    selection) funnel through - only the point source differs.
+    """
     ex, ey, ez = axis_vectors(rotation_3x3)
     mins = [float('inf')] * 3
     maxs = [float('-inf')] * 3
-    for p in world_corners(objects):
+    empty = True
+    for p in points:
+        empty = False
         for i, axis_vec in enumerate((ex, ey, ez)):
             s = axis_vec.dot(p)
             if s < mins[i]:
                 mins[i] = s
             if s > maxs[i]:
                 maxs[i] = s
+    if empty:
+        return None
     return mins, maxs
+
+
+def local_aabb(objects, rotation_3x3):
+    """Axis-aligned bounds (in the given local frame) of all objects' world-space
+    bounding-box corners. Returns (mins, maxs), each a 3-tuple of scalar projections
+    onto the local X/Y/Z axes."""
+    return local_aabb_from_points(world_corners(objects), rotation_3x3)
+
+
+def bmesh_selected_corners(bm, matrix_world):
+    """World-space coordinates of every selected vertex in `bm`.
+
+    Verts are the right primitive regardless of the mesh select mode -
+    selecting an edge or face selects its verts too, so this covers vertex,
+    edge, and face selections uniformly.
+    """
+    for v in bm.verts:
+        if v.select:
+            yield matrix_world @ v.co
+
+
+def edit_mesh_local_aabb(context, rotation_3x3):
+    """Axis-aligned bounds (in the given local frame) of the selected mesh
+    elements across every object in Edit Mesh (`context.objects_in_mode`).
+    Returns (mins, maxs), or None if nothing is selected anywhere.
+    """
+    def points():
+        for obj in context.objects_in_mode:
+            bm = bmesh.from_edit_mesh(obj.data)
+            yield from bmesh_selected_corners(bm, obj.matrix_world)
+
+    return local_aabb_from_points(points(), rotation_3x3)
 
 
 def point_from_local(rotation_3x3, sx, sy, sz):

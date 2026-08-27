@@ -8,7 +8,7 @@ roblox_tools/
 ├── core/                  shared math, state, and two engines
 │   ├── bounds.py          AABB construction, overlap and ray/slab tests
 │   ├── gizmo_common.py    axis colours, axis rotations, local-basis helper
-│   ├── keymaps.py         global Q/W/E/R and Ctrl+1..4 tool shortcuts
+│   ├── keymaps.py         global Ctrl+1..4 tool shortcuts
 │   ├── picking.py         pick_element: one vertex/edge/face under the cursor
 │   ├── pivot.py           pivot_point: Center / Origin / Swivel
 │   ├── preferences.py     AddonPreferences + get_pref accessor

@@ -1,5 +1,5 @@
-"""Pick the swivel pivot: click a vertex, edge or face and every RoTools
-transform tool pivots around it from then on.
+"""Pick the swivel pivot: click a vertex, edge or face and the Rotate tool
+pivots around it from then on.
 
 Modal rather than a one-shot click so the element under the cursor can be
 previewed before committing - picking a pivot you cannot see until after you
@@ -10,12 +10,19 @@ Committing switches `scene.rotools_pivot_mode` to SWIVEL, because setting a
 swivel and then not using it is never what was meant. The World/Local
 orientation setting keeps applying on top, exactly as it does for the Center and
 Origin pivots.
+
+Rotate-only: the keymap/button that invoke this only exist on the Rotate tool,
+and `poll` enforces it too so the operator search menu can't bypass that. The
+picked point does not outlive the tool either - `ui/overlay.py` clears it on
+any tool change, since a swivel is only ever meant for the Rotate that set it.
 """
 
 import bpy
 
 from ..core.picking import pick_element
 from ..ui import overlay
+
+ROTATE_TOOL_ID = "rotools.rotate_tool"
 
 ELEMENT_KEYS = {
     'A': 'AUTO',
@@ -35,7 +42,10 @@ class ROTOOLS_OT_set_swivel(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.mode == 'OBJECT' and context.region_data is not None
+        if context.mode != 'OBJECT' or context.region_data is None:
+            return False
+        tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
+        return tool is not None and tool.idname == ROTATE_TOOL_ID
 
     def invoke(self, context, event):
         self.pick = None

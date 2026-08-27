@@ -114,7 +114,7 @@ The three pixel values are **screen-space**, not world distances.
   face. **Converted through `pixels_to_world` at the point's depth every
   frame**, so the pull feels identical zoomed in and zoomed out. This is the
   project's hard rule: never hardcode a flat world-space margin.
-- `use_tool_shortcuts` — gates all eight global `Q/W/E/R` + `Ctrl+1..4`
+- `use_tool_shortcuts` — gates all four global `Ctrl+1..4`
   bindings, which shadow Blender's own. Its `update` callback calls
   `keymaps.refresh()`, which re-applies the bindings **and** calls
   `wm.keyconfigs.update()`; see
@@ -229,20 +229,20 @@ disagree. See [12-swivel-and-pivot.md](12-swivel-and-pivot.md#121-the-three-mode
 
 ```
 Toolbar (Object Mode, 3D Viewport)
-├── Roblox Select                    ← Q  /  Ctrl+1
+├── Roblox Select                    ← Ctrl+1
 │   ├── [Grid ▣] [size]              rotools_drag_grid_snap / _grid_size
 │   ├── [Soft Snap ▣]                rotools_drag_soft_snap  (greyed while Grid is on)
 │   ├── [Align ▣]                    rotools_drag_surface_align
 │   ├── [Ground ▣] [height]          rotools_drag_use_ground / _ground_z
 │   └── (orientation/pivot block)
-├── Roblox Move                      ← W  /  Ctrl+2
+├── Roblox Move                      ← Ctrl+2
 │   └── (orientation/pivot block)
 │       [Snap ▣] [elements] [Increment]      rotools_snap_move
-├── Roblox Scale                     ← E  /  Ctrl+3
+├── Roblox Scale                     ← Ctrl+3
 │   └── (orientation/pivot block)
 │       [Opposite Face | Center]     rotools_scale_pivot  (greyed in SWIVEL mode)
 │       [Snap ▣] [elements]          rotools_snap_scale
-└── Roblox Rotate                    ← R  /  Ctrl+4
+└── Roblox Rotate                    ← Ctrl+4
     └── (orientation/pivot block)
         [Snap ▣] [Increment]         rotools_snap_rotate / snap_angle_increment_3d
 
@@ -255,5 +255,5 @@ Preferences ▸ Add-ons ▸ RoTools
 ├── Box Select Drag Threshold (px)   default 5,  range 1–50
 ├── Soft Snap Margin (px)            default 12, range 1–100
 ├── Swivel Marker Size (px)          default 9,  range 3–40
-└── Tool Shortcuts ▣                 default on — Q/W/E/R + Ctrl+1..4
+└── Tool Shortcuts ▣                 default on — Ctrl+1..4
 ```

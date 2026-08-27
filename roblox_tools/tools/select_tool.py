@@ -27,7 +27,7 @@ class ROTOOLS_WT_select(WorkSpaceTool):
         ),
         ("rotools.toggle_orientation", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         ("rotools.cycle_pivot", {"type": 'L', "value": 'PRESS', "ctrl": True, "shift": True}, None),
-        ("rotools.set_swivel", {"type": 'V', "value": 'PRESS'}, None),
+        ("rotools.duplicate", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
     )
 
     def draw_settings(context, layout, tool):

@@ -12,6 +12,7 @@ import bpy
 
 from .operators import select as op_select
 from .operators import drag as op_drag
+from .operators import duplicate as op_duplicate
 from .operators import toggle_orientation as op_toggle_orientation
 from .operators import set_swivel as op_set_swivel
 from .operators import switch_tool as op_switch_tool
@@ -25,6 +26,7 @@ MODULES = (
     scene_state,
     op_select,
     op_drag,
+    op_duplicate,
     op_toggle_orientation,
     op_set_swivel,
     op_switch_tool,

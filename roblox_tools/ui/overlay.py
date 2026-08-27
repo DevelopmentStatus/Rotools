@@ -40,6 +40,11 @@ LINE_WIDTH = 2.0
 _handle = None
 # Set by `rotools.set_swivel` while its modal is running; a `PickResult` or None.
 _preview = None
+# The active tool's idname as of the last redraw. A sentinel (not None) so the
+# first redraw after registration never counts as a change - only an actual
+# switch should drop the swivel.
+_UNOBSERVED = object()
+_last_tool_idname = _UNOBSERVED
 
 
 def set_preview(pick):
@@ -59,9 +64,36 @@ def _tag_redraw():
                 area.tag_redraw()
 
 
-def _rotools_tool_active(context):
+def _active_tool_idname(context):
     tool = context.workspace.tools.from_space_view3d_mode(context.mode, create=False)
-    return tool is not None and tool.idname in ROTOOLS_TOOL_IDS
+    return tool.idname if tool is not None else None
+
+
+def _rotools_tool_active(context):
+    return _active_tool_idname(context) in ROTOOLS_TOOL_IDS
+
+
+def _clear_swivel_on_tool_change(context):
+    """Swivel only means anything while Rotate is active - see set_swivel.py -
+    so any switch away from (or between) tools drops it rather than leaving a
+    stale pick that silently applies if the user swivels back to Rotate later.
+    """
+    global _last_tool_idname
+    idname = _active_tool_idname(context)
+    if _last_tool_idname is _UNOBSERVED:
+        _last_tool_idname = idname
+        return
+    if idname == _last_tool_idname:
+        return
+    _last_tool_idname = idname
+
+    scene = context.scene
+    if not scene.rotools_swivel_is_set:
+        return
+    scene.rotools_swivel_is_set = False
+    scene.rotools_swivel_kind = ""
+    if scene.rotools_pivot_mode == 'SWIVEL':
+        scene.rotools_pivot_mode = 'CENTER'
 
 
 def _draw_lines(region, segments, color):
@@ -111,6 +143,8 @@ def _draw():
     rv3d = context.region_data
     if region is None or rv3d is None:
         return
+
+    _clear_swivel_on_tool_change(context)
     if not _rotools_tool_active(context):
         return
 
@@ -153,8 +187,9 @@ def register():
 
 
 def unregister():
-    global _handle, _preview
+    global _handle, _preview, _last_tool_idname
     _preview = None
+    _last_tool_idname = _UNOBSERVED
     if _handle is not None:
         bpy.types.SpaceView3D.draw_handler_remove(_handle, 'WINDOW')
         _handle = None

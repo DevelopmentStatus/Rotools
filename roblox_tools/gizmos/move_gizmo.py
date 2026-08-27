@@ -14,7 +14,7 @@ active pivot (Center / Origin / Swivel) is shown.
 import bpy
 from mathutils import Matrix
 
-from ..core.bounds import AXIS_INDEX, aabb_center, local_aabb
+from ..core.bounds import AXIS_INDEX, aabb_center, edit_mesh_local_aabb, local_aabb
 from ..core.bounds import point_from_local
 from ..core.pivot import pivot_point, transform_objects
 from ..core.gizmo_common import (
@@ -43,6 +43,8 @@ class ROTOOLS_GGT_move(bpy.types.GizmoGroup):
 
     @classmethod
     def poll(cls, context):
+        if context.mode == 'EDIT_MESH':
+            return bool(context.objects_in_mode)
         return context.mode == 'OBJECT' and context.selected_objects
 
     def _make_axis_gizmo(self, axis):
@@ -82,30 +84,35 @@ class ROTOOLS_GGT_move(bpy.types.GizmoGroup):
         if pivot is None:
             return
 
-        objects = transform_objects(context)
         # In SWIVEL mode the arrows radiate from the picked point - the whole
         # point of setting a swivel is to work from it. Otherwise they sit on
         # the bounding-box faces, Studio style. A selection of nothing but
-        # Empties has no box to sit on, so it falls back to the pivot too.
+        # Empties (Object Mode) or nothing selected (Edit Mesh) has no box to
+        # sit on, so it falls back to the pivot too.
         face_positions = None
-        if objects and context.scene.rotools_pivot_mode != 'SWIVEL':
-            mins, maxs = local_aabb(objects, rotation_3x3)
-            mid = aabb_center(mins, maxs)
-            bounds = {1: maxs, -1: mins}
-            face_positions = {}
-            for axis, sign in HANDLES:
-                i = AXIS_INDEX[axis]
-                scalars = list(mid)
-                scalars[i] = bounds[sign][i] + sign * HANDLE_GAP
-                face_positions[(axis, sign)] = point_from_local(rotation_3x3, *scalars)
+        if context.scene.rotools_pivot_mode != 'SWIVEL':
+            if context.mode == 'EDIT_MESH':
+                aabb = edit_mesh_local_aabb(context, rotation_3x3)
+            else:
+                objects = transform_objects(context)
+                aabb = local_aabb(objects, rotation_3x3) if objects else None
+            if aabb is not None:
+                mins, maxs = aabb
+                mid = aabb_center(mins, maxs)
+                bounds = {1: maxs, -1: mins}
+                face_positions = {}
+                for axis, sign in HANDLES:
+                    i = AXIS_INDEX[axis]
+                    scalars = list(mid)
+                    scalars[i] = bounds[sign][i] + sign * HANDLE_GAP
+                    face_positions[(axis, sign)] = point_from_local(rotation_3x3, *scalars)
 
         for (axis, sign), gz in self.axis_gizmos.items():
             self.axis_ops[(axis, sign)].orient_type = orient_type
-            if gz.is_modal:
-                # Leave a handle's own matrix alone while it is being dragged -
-                # Blender is already driving it interactively, and overwriting
-                # matrix_basis out from under that fights the drag.
-                continue
+            # Recomputed every redraw, including while gz.is_modal - the arrow's
+            # own built-in interactive offset isn't Shift-precision-aware, so
+            # tracking the live (already-correctly-slowed) object here is what
+            # keeps the drawn handle in sync with the object during a Shift-drag.
             position = pivot if face_positions is None else face_positions[(axis, sign)]
             rot = axis_rotations[axis] if sign == 1 else axis_rotations[axis] @ FLIP_ROTATION
             gz.matrix_basis = Matrix.Translation(position) @ rot

@@ -1,23 +1,19 @@
 """Global Object Mode shortcuts for switching RoTools tools.
 
 These shadow Blender's own bindings in the same keymap - verified against the
-resolved user keyconfig, `rotools.switch_tool` sorts ahead of `transform.rotate`
-on R and ahead of `object.subdivision_set` on Ctrl+1..4. That is a real cost for
-a Blender user, so the whole set is behind the `use_tool_shortcuts` preference
-and can be turned off without editing this file.
+resolved user keyconfig, `rotools.switch_tool` sorts ahead of
+`object.subdivision_set` on Ctrl+1..4. That is a real cost for a Blender user,
+so the whole set is behind the `use_tool_shortcuts` preference and can be
+turned off without editing this file.
 """
 
 import bpy
 
 from .preferences import get_pref
 
-# (letter/number key, ctrl, tool_id) - Q/W/E/R mirror Roblox's own convenient adjacency;
+# (letter/number key, ctrl, tool_id) -
 # Ctrl+1/2/3/4 mirror Roblox Studio's exact Select/Move/Scale/Rotate shortcuts.
 BINDINGS = (
-    ('Q', False, "rotools.select_tool"),
-    ('W', False, "rotools.move_tool"),
-    ('E', False, "rotools.scale_tool"),
-    ('R', False, "rotools.rotate_tool"),
     ('ONE', True, "rotools.select_tool"),
     ('TWO', True, "rotools.move_tool"),
     ('THREE', True, "rotools.scale_tool"),
@@ -47,9 +43,10 @@ def refresh():
 
     The `keyconfigs.update()` is load-bearing. Removing items from the *addon*
     keyconfig does not touch the resolved *user* keyconfig, which is a cached
-    merge - verified in 5.2, the addon keymap went 8 items -> 0 while the user
-    keymap still listed all 8, so R stayed shadowed until Blender happened to
-    rebuild. `update()` forces that rebuild, and the count drops to 0 at once.
+    merge - verified in 5.2, the addon keymap went 4 items -> 0 while the user
+    keymap still listed all 4, so Ctrl+1..4 stayed shadowed until Blender
+    happened to rebuild. `update()` forces that rebuild, and the count drops
+    to 0 at once.
     """
     unregister()
     register()

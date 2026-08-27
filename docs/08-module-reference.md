@@ -58,7 +58,7 @@ See [06-gizmos.md](06-gizmos.md#62-coregizmo_commonpy--the-shared-basis) for the
 
 | Symbol | Kind | Notes |
 | --- | --- | --- |
-| `BINDINGS` | `tuple` | 8 `(key, ctrl, tool_id)` triples: Q/W/E/R and Ctrl+1..4 |
+| `BINDINGS` | `tuple` | 4 `(key, ctrl, tool_id)` triples: Ctrl+1..4 |
 | `addon_keymaps` | `list` | Module-level `(km, kmi)` registry for clean teardown |
 | `register()` / `unregister()` | functions | Adds/removes items in the `Object Mode` keymap (`space_type='EMPTY'`) on the addon keyconfig |
 
@@ -232,7 +232,7 @@ the new value. `bl_options = {'UNDO'}`. Bound to `Ctrl+L` in the Move tool's
 | `tool_id` | `StringProperty` |
 | `execute` | `bpy.ops.wm.tool_set_by_id(name=self.tool_id)` |
 
-A one-line wrapper so the eight keymap items have a single addon-owned idname
+A one-line wrapper so the four keymap items have a single addon-owned idname
 to bind and unregister.
 
 ---

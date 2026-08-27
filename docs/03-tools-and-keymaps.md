@@ -133,16 +133,12 @@ master alone, so turning off Move snap does not silently kill Rotate snap.
 
 ## Global keyboard shortcuts
 
-[`core/keymaps.py`](../roblox_tools/core/keymaps.py) registers eight items into
+[`core/keymaps.py`](../roblox_tools/core/keymaps.py) registers four items into
 the **`Object Mode`** keymap (`space_type='EMPTY'`) on the *addon* keyconfig,
 each invoking `rotools.switch_tool` with a `tool_id`:
 
 | Shortcut | Tool | Rationale |
 | --- | --- | --- |
-| `Q` | Select | Q/W/E/R mirror Roblox's convenient adjacency |
-| `W` | Move | " |
-| `E` | Scale | " |
-| `R` | Rotate | " |
 | `Ctrl+1` | Select | Roblox Studio's own exact shortcuts |
 | `Ctrl+2` | Move | " |
 | `Ctrl+3` | Scale | " |
@@ -165,18 +161,14 @@ they shadow existing behaviour:
 
 | Key | RoTools binds (keymap) | Blender default (keymap) | Effect |
 | --- | --- | --- | --- |
-| `R` | `rotools.switch_tool` (**Object Mode**) | `transform.rotate` (**Object Mode**) | **Direct shadow.** In the resolved user keyconfig the RoTools item is ordered ahead of `transform.rotate` in the same keymap, so pressing `R` in Object Mode switches tool instead of starting a rotate. |
 | `Ctrl+1` … `Ctrl+4` | `rotools.switch_tool` (**Object Mode**) | `object.subdivision_set` (**Object Mode**) | **Direct shadow**, same keymap, RoTools ordered first. Subdivision-level shortcuts are unavailable while the addon is enabled. |
-| `Q` | `rotools.switch_tool` (**Object Mode**) | `wm.call_menu` (**Window**) | Different keymaps; Object Mode is the more specific handler. |
-| `W` | `rotools.switch_tool` (**Object Mode**) | `wm.tool_set_by_id` (**3D View**) | Different keymaps; the default `W` is Blender's own tool-cycle, so the intent is similar. |
-| `E` | `rotools.switch_tool` (**Object Mode**) | *(no Object Mode default)* | No conflict in Object Mode. |
 
 Because the addon only binds into the **Object Mode** keymap, Edit Mode's `R`,
 `E`, `S` and friends are untouched.
 
 **Mitigation:** the whole set is behind the **Tool Shortcuts** addon
 preference (`use_tool_shortcuts`, default on). Turning it off unregisters all
-eight items immediately and gives `R` and `Ctrl+1..4` back.
+four items immediately and gives `Ctrl+1..4` back.
 
 > The `bpy.context.window_manager.keyconfigs.update()` inside
 > `keymaps.refresh()` is what makes "immediately" true. **Verified**: removing

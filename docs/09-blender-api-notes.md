@@ -216,14 +216,10 @@ ordered *ahead of* Blender's defaults in the same keymap:
 
 | Key | RoTools item (keymap) | Blender default (keymap) |
 | --- | --- | --- |
-| `R` | `rotools.switch_tool` (Object Mode) | `transform.rotate` (Object Mode) |
 | `Ctrl+1..4` | `rotools.switch_tool` (Object Mode) | `object.subdivision_set` (Object Mode) |
-| `Q` | `rotools.switch_tool` (Object Mode) | `wm.call_menu` (Window) |
-| `W` | `rotools.switch_tool` (Object Mode) | `wm.tool_set_by_id` (3D View) |
-| `E` | `rotools.switch_tool` (Object Mode) | *(none in Object Mode)* |
 
-The first two are same-keymap shadows, so those defaults are genuinely
-unreachable while the addon is enabled. Full discussion:
+This is a same-keymap shadow, so that default is genuinely unreachable while
+the addon is enabled. Full discussion:
 [03-tools-and-keymaps.md](03-tools-and-keymaps.md#shortcut-conflicts-with-blenders-defaults).
 
 ---

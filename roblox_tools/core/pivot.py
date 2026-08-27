@@ -20,7 +20,7 @@ else entirely.
 
 from mathutils import Matrix, Vector
 
-from .bounds import aabb_center, local_aabb, point_from_local
+from .bounds import aabb_center, edit_mesh_local_aabb, local_aabb, point_from_local
 
 # An Empty's bound_box is eight zero vectors in Blender 5.2, so a selected
 # Empty would otherwise drag the bounding-box centre toward its origin and
@@ -55,6 +55,29 @@ def swivel_point(scene):
     return Vector(scene.rotools_swivel_point)
 
 
+def _edit_mesh_pivot(context, scene, rotation_3x3):
+    """CENTER/ORIGIN pivot for a bmesh selection, across every object being
+    edited (`context.objects_in_mode`). SWIVEL is handled by the caller - a
+    picked swivel point is a world-space coordinate regardless of mode.
+    """
+    objects = context.objects_in_mode
+    if not objects:
+        return None
+
+    if scene.rotools_pivot_mode == 'ORIGIN':
+        # No per-vertex analog to an object's origin - same treatment Object
+        # Mode gives a multi-object selection.
+        return origin_median(objects)
+
+    if rotation_3x3 is None:
+        rotation_3x3 = Matrix.Identity(3)
+    aabb = edit_mesh_local_aabb(context, rotation_3x3)
+    if aabb is None:
+        return None
+    mins, maxs = aabb
+    return point_from_local(rotation_3x3, *aabb_center(mins, maxs))
+
+
 def pivot_point(context, rotation_3x3=None):
     """The active pivot, in world space, or None when nothing is selected.
 
@@ -70,6 +93,9 @@ def pivot_point(context, rotation_3x3=None):
             return point
         # No swivel picked yet - fall through to CENTER rather than dropping the
         # handles at the world origin.
+
+    if context.mode == 'EDIT_MESH':
+        return _edit_mesh_pivot(context, scene, rotation_3x3)
 
     objects = transform_objects(context)
     if not objects:

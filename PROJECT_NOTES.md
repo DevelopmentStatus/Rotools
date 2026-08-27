@@ -4,6 +4,132 @@ Running log of decisions, gotchas, and in-progress work for RoTools. Newest
 entries at the top. This is the project's persistent memory since there is
 no git history to consult.
 
+## 2026-08-27 — Removed the Q/W/E/R tool-switch shortcuts
+
+**Dropped the `Q`/`W`/`E`/`R` bindings from `core/keymaps.py`'s `BINDINGS`
+tuple**, keeping only `Ctrl+1..4` (Roblox Studio's own exact shortcuts).
+`Q`/`W`/`E`/`R` shadowed Blender's own `wm.call_menu`, tool-cycle, and
+`transform.rotate` bindings in Object Mode - too much of a cost for a
+Blender user's muscle memory versus the adjacency convenience they bought.
+`use_tool_shortcuts` now only gates the four `Ctrl+1..4` items.
+
+Updated every place that documented the old eight-item set as current
+behavior to match: `core/preferences.py`'s property description and the
+addon-preferences panel labels, `core/keymaps.py`'s own docstrings, and
+`docs/01-overview.md`, `02-architecture.md`, `03-tools-and-keymaps.md`,
+`07-settings-reference.md`, `08-module-reference.md`, `09-blender-api-notes.md`,
+and `11-known-gaps.md`. Left the 2026-08-25 entry below describing the
+original opt-out decision as-is - it's a record of what was true when it was
+built, not a live reference.
+
+## 2026-08-26 — Edit Mode support, v1: Move tool
+
+Built from a user brainstorm doc, refined into a plan after three parallel
+codebase-exploration passes and two empirical spikes (see the plan file
+referenced in this session). The brainstorm's own assumptions needed two
+corrections before implementation:
+
+**`bmesh.update_edit_mesh`'s `destructive` default is `True`, not `False`** as
+the brainstorm assumed - verified against the bundled Blender Python API docs.
+Pass `destructive=False` explicitly for a pure position-only update (nothing
+added/removed).
+
+**`WorkSpaceTool.bl_context_mode` does not accept a tuple of modes.** Verified
+by triggering it live: `bpy.utils.register_tool` uses `bl_context_mode` as a
+plain dict key (`cls._tools[context_mode]`), and registering a class with
+`bl_context_mode = ('OBJECT', 'EDIT_MESH')` raises `KeyError: ('OBJECT',
+'EDIT_MESH')` immediately. The working pattern - also verified live - is two
+separate `WorkSpaceTool` subclasses sharing one `bl_idname`, one per mode,
+each registered independently; Blender resolves them as the same tool
+activating in both modes. `tools/move_tool.py` now defines
+`ROTOOLS_WT_move` (OBJECT) and `ROTOOLS_WT_move_edit` (EDIT_MESH) this way,
+written as two flat classes rather than a shared base class, matching every
+other tool file's existing style and keeping the documented
+`WorkSpaceTool.__subclasses__()` stuck-registration recovery trick (see the
+2026-08-24 entry) valid without modification - a shared base would put the
+real tool classes one level deeper than that recovery walk checks.
+
+**Scope for v1: only the Move tool, and only its gizmo.** Two calls made
+during planning, both worth remembering if Scale/Rotate get the same
+treatment later:
+- `operators/select.py`'s body-click drag-vs-box-select heuristic
+  (`allow_drag`) stays Object-Mode-only. This turned out to need no
+  changes at all for Move: Move/Scale/Rotate already invoke `rotools.select`
+  with `allow_drag=False` (the default, never overridden in their own
+  keymaps), so the operator's body unconditionally falls through to
+  Blender's native `view3d.select`/`view3d.select_box` - both already
+  mode-agnostic. Only the standalone Select tool sets `allow_drag=True`, and
+  that tool wasn't touched.
+- **`operators/drag.py` (`rotools.drag`) needs no changes for this scope.**
+  Discovered while starting what the plan called its highest-risk step: all
+  three gizmo groups drive Blender's *native* `transform.translate` /
+  `resize` / `rotate` directly via `target_set_operator`, entirely
+  independent of `rotools.drag` - which is invoked only from
+  `select.py`'s deferred body-click path and `duplicate.py`'s Ctrl+D. Native
+  `transform.translate` already works correctly on a bmesh selection with
+  zero RoTools code changes. The bmesh-mutation-safety spike below remains
+  valid groundwork for a future full-drag-in-Edit-Mesh phase, just isn't on
+  this scope's critical path.
+
+**`core/bounds.py`** gained `local_aabb_from_points` (the projection loop
+extracted from the existing `local_aabb`, which now just calls it with
+`world_corners(objects)`), `bmesh_selected_corners` (world-space coordinate
+of every selected `BMVert` - verts cover vertex/edge/face select modes
+uniformly, since selecting an edge or face selects its verts too), and
+`edit_mesh_local_aabb` (walks `context.objects_in_mode`, supporting
+multi-object Edit Mode from the start). Verified headlessly: a 2x2x2 cube's
++X face selection gave `x:6..6, y:-1..1, z:0..2`; full selection gave the
+whole cube's box; empty selection gave `None`. Object Mode's `local_aabb`
+confirmed unchanged after the refactor.
+
+**`core/pivot.py`**'s `pivot_point` gained an `EDIT_MESH` branch
+(`_edit_mesh_pivot`): CENTER uses `edit_mesh_local_aabb`, ORIGIN falls back to
+the median of `context.objects_in_mode`'s origins (no per-vertex analog,
+same treatment Object Mode gives a multi-object selection), SWIVEL is
+unchanged since it's already a stored world-space point. Signature and
+return type untouched, so every caller needs no changes. Verified: CENTER on
+the +X face selection gave `(6,0,1)`; ORIGIN gave the object's origin
+`(5,0,1)`; empty selection gave `None`.
+
+**`gizmos/move_gizmo.py`**'s `poll` now accepts `EDIT_MESH` when
+`context.objects_in_mode` is non-empty; `draw_prepare`'s face-handle
+placement branches to `edit_mesh_local_aabb` in that mode. Verified two ways:
+headlessly, by calling `draw_prepare` directly against lightweight
+gizmo/operator stand-ins (bypassing the need for a live registered gizmo
+instance) - center at `(6,0,1)`, ±X handles symmetric at `5.88`/`6.12`
+(correct: a flat face selection has zero thickness along its own normal, so
+both handles straddle the same plane ± the handle gap); and live, after a
+full documented reload, confirming `rotools.move_tool` activates in both
+Object and Edit Mesh and the gizmo's `poll` returns `True` in Edit Mesh with
+a real selection. Screenshot verification hit the same all-black-frame
+environment limitation noted in the 2026-08-25 entry (occluded/minimized
+window capture) - not a code defect, and not re-litigated here.
+
+**Bmesh per-frame-mutation safety spike** (throwaway, not committed):
+registered a scratch operator that wrote 120 sequential `BMVert.co` updates
+plus `bmesh.update_edit_mesh(destructive=False)` calls against a ~2600-vert
+selection, all within one `execute()`. Averaged 0.19ms/frame (worst
+0.52ms) - well under a 16ms frame budget - with correct final positions and
+no corruption. Undo-step-count could not be verified through this session's
+scripting bridge (`bpy.ops.ed.undo`'s `poll` refuses to run outside a real
+interactive context, unrelated to the addon) - deferred to manual
+verification alongside the click-drag test below, though the documented
+operator-undo contract (one step per `FINISHED`, regardless of how many
+mutations happened during `execute`) already covers this and matches how
+`drag.py`'s existing Object Mode code already behaves in production.
+
+**Not yet verified - needs a human at the keyboard**, same category as the
+2026-08-26 duplicate/swivel entry below: dragging the Move gizmo's arrows/
+center ring on a real vert/edge/face selection in the live viewport (visual
+confirmation the handles draw and drag correctly - the MCP tooling here has
+no way to simulate viewport mouse input), and a real Ctrl+Z after such a
+drag.
+
+Explicitly out of scope, not forgotten: mesh-geometry snapping, Ctrl+D in
+Edit Mesh, Scale/Rotate tools in Edit Mesh, `rotools.set_swivel` in Edit
+Mesh, the N-panel, and updating `docs/01-overview.md`'s compatibility table
+(deferred until this v1 gets its manual verification pass).
+
 ## 2026-08-26 — Verified duplicate/swivel rescope, fixed the rotate-increment leak
 
 **Verified the uncommitted duplicate + swivel-rescope change.** Working tree

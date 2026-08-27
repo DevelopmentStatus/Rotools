@@ -1,7 +1,7 @@
 import bpy
 from bpy.types import WorkSpaceTool
 
-from ..ui.tool_ui import draw_orientation_row, draw_snap_row
+from ..ui.tool_ui import draw_orientation_row, draw_snap_row, draw_swivel_row
 
 
 class ROTOOLS_WT_rotate(WorkSpaceTool):
@@ -21,10 +21,12 @@ class ROTOOLS_WT_rotate(WorkSpaceTool):
         ("rotools.toggle_orientation", {"type": 'L', "value": 'PRESS', "ctrl": True}, None),
         ("rotools.cycle_pivot", {"type": 'L', "value": 'PRESS', "ctrl": True, "shift": True}, None),
         ("rotools.set_swivel", {"type": 'V', "value": 'PRESS'}, None),
+        ("rotools.duplicate", {"type": 'D', "value": 'PRESS', "ctrl": True}, None),
     )
 
     def draw_settings(context, layout, tool):
         draw_orientation_row(context, layout)
+        draw_swivel_row(context, layout)
         draw_snap_row(context, layout, "rotools_snap_rotate", elements=False)
 
 

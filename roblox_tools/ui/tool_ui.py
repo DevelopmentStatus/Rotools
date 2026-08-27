@@ -8,7 +8,7 @@ LOCAL, and each tool grew its own subtly different snap row.
 
 
 def draw_orientation_row(context, layout):
-    """World / Local, the active pivot, and the swivel controls."""
+    """World / Local and the active pivot mode."""
     scene = context.scene
 
     row = layout.row(align=True)
@@ -16,6 +16,17 @@ def draw_orientation_row(context, layout):
 
     row = layout.row(align=True)
     row.prop(scene, "rotools_pivot_mode", text="")
+
+
+def draw_swivel_row(context, layout):
+    """The swivel pick/clear controls and, in SWIVEL mode, what is set.
+
+    Rotate-only: swivel can only be picked while the Rotate tool is active
+    (see operators/set_swivel.py), so no other tool draws this row.
+    """
+    scene = context.scene
+
+    row = layout.row(align=True)
     row.operator("rotools.set_swivel", text="Set Swivel", icon='EYEDROPPER')
     sub = row.row(align=True)
     sub.enabled = scene.rotools_swivel_is_set

@@ -63,25 +63,24 @@ source of truth for the unbuilt tiers is missing.
 
 ## 11.3 Behavioural sharp edges
 
-### Keymap shadowing — `R` and `Ctrl+1..4`
+### Keymap shadowing — `Ctrl+1..4`
 
 **Verified** against the resolved user keyconfig: RoTools' `Object Mode` items
 sit ahead of Blender's own in the same keymap.
 
 | Key | Shadows | Consequence |
 | --- | --- | --- |
-| `R` | `transform.rotate` | Pressing `R` in Object Mode switches to the Roblox Rotate tool instead of starting a rotate |
 | `Ctrl+1` … `Ctrl+4` | `object.subdivision_set` | Subdivision-level shortcuts unavailable in Object Mode |
 
 Edit Mode is untouched, since the addon only binds into `Object Mode`.
 
 **Now opt-out** via the `use_tool_shortcuts` preference, which unregisters all
-eight items and calls `wm.keyconfigs.update()` so the change lands immediately
+four items and calls `wm.keyconfigs.update()` so the change lands immediately
 rather than at the next restart.
 
-*Impact:* medium → low. Still **on by default**, so a Blender user who installs
-the addon still loses `R` until they find the preference. Whether that default
-should flip is a judgement call, not a bug.
+*Impact:* low. Still **on by default**, so a Blender user who installs
+the addon loses their `Ctrl+1..4` subdivision shortcuts until they find the
+preference. Whether that default should flip is a judgement call, not a bug.
 
 ### The 15° rotate increment is not restored on unregister
 

@@ -60,12 +60,13 @@ class RoToolsPreferences(bpy.types.AddonPreferences):
 
     # Verified against the resolved user keyconfig: these items sort ahead of
     # Blender's own inside `Object Mode`, so they really do shadow them. Made
-    # opt-out rather than unconditional because R is deep Blender muscle memory.
+    # opt-out rather than unconditional because Ctrl+1..4 is still a real cost
+    # for a Blender user.
     use_tool_shortcuts: bpy.props.BoolProperty(
         name="Tool Shortcuts",
-        description="Bind Q/W/E/R and Ctrl+1..4 to the RoTools tools. These shadow "
-                    "Blender's own Object Mode bindings: R no longer starts a rotate, "
-                    "and Ctrl+1..4 no longer set subdivision levels",
+        description="Bind Ctrl+1..4 to the RoTools tools. This shadows "
+                    "Blender's own Object Mode bindings: Ctrl+1..4 no longer set "
+                    "subdivision levels",
         default=True,
         update=_shortcuts_changed,
     )
@@ -90,8 +91,8 @@ class RoToolsPreferences(bpy.types.AddonPreferences):
         box.prop(self, "use_tool_shortcuts")
         sub = box.column(align=True)
         sub.active = self.use_tool_shortcuts
-        sub.label(text="Q / W / E / R  and  Ctrl+1..4  select Select / Move / Scale / Rotate", icon='INFO')
-        sub.label(text="While on: R does not start transform.rotate, Ctrl+1..4 do not set subdivision levels")
+        sub.label(text="Ctrl+1..4 select Select / Move / Scale / Rotate", icon='INFO')
+        sub.label(text="While on: Ctrl+1..4 do not set subdivision levels")
 
 
 def register():

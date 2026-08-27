@@ -52,7 +52,7 @@ this addon deliberately reproduces:
 | Surface alignment on drop | `rotools_drag_surface_align` | `operators/drag.py:176` |
 | World / Local space toggle (Ctrl+L, any tool) | `rotools_orientation` | `operators/toggle_orientation.py` |
 | Pivot from a picked vertex / edge / face | `rotools_pivot_mode = 'SWIVEL'` | `operators/set_swivel.py`, `core/picking.py` |
-| Ctrl+1/2/3/4 tool shortcuts | Same bindings | `core/keymaps.py:10-13` |
+| Ctrl+1/2/3/4 tool shortcuts | Same bindings | `core/keymaps.py:17-20` |
 
 ## Feature matrix
 
