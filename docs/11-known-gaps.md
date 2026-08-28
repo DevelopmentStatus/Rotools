@@ -4,9 +4,10 @@ Everything here was found by reading the current source or probing a live
 Blender. Nothing in this file has been changed unasked — per `CLAUDE.md`,
 noticing an unrelated problem means mentioning it, not fixing it.
 
-Last revised 2026-08-25, after the tool-comparison pass. §11.6 lists what that
-pass **closed**, so this file is not read as a to-do list that has already been
-done.
+Last revised 2026-08-27. §11.6 lists what the 2026-08-25 tool-comparison pass
+closed; §11.7 lists what closed since, through the Edit Mesh Scale/Rotate
+extension and the Collidable toggle. So this file is not read as a to-do list
+that has already been done.
 
 ---
 
@@ -31,12 +32,15 @@ Developer Mode and works across local volumes.
 *Impact:* was high, now closed. The old copy is parked in this session's
 scratchpad if anything needs recovering from it.
 
-### `roblox_tools.zip` — deleted
+### `roblox_tools.zip` — deleted, packaging now lives on GitHub Releases
 
-The archive was a 2026-08-23 build, missing the dragger entirely. Deleted
-2026-08-25 rather than maintained by hand. There is currently **no packaging
-artifact**; see [10-development.md](10-development.md) for how to build one on
-demand.
+The old in-repo archive was a 2026-08-23 build, missing the dragger entirely.
+Deleted 2026-08-25 rather than maintained by hand. There is still **no
+packaging artifact in the tree**; see [10-development.md](10-development.md)
+for how to build one on demand. As of 2026-08-27 that build step is used to
+attach a zip to each tagged **GitHub Release** (`v0.2.0`, `v0.3.0`) instead —
+the release asset is the packaged build, and the repo itself stays
+build-artifact-free.
 
 ### `dragger-addon-priorities.md` is still not in the repo
 
@@ -55,9 +59,9 @@ source of truth for the unbuilt tiers is missing.
 | Tier | Feature | Status |
 | --- | --- | --- |
 | 3 | `Ctrl+D` drag-stamp duplication | **Built** 2026-08-25 |
-| 4 | `blf` / `gpu` on-canvas HUD | Not started. The status bar + area header carry the readout instead. `ui/overlay.py` now does `gpu` drawing for the swivel marker, so the machinery exists |
-| 5 | Animated tilt on surface align | Not started. The tilt is instantaneous |
-| 6 | Per-object "collidable" filtering | Not started. `DragScene.candidates` takes every visible mesh |
+| 4 | `blf` / `gpu` on-canvas HUD | **Declined** 2026-08-27 — not being built. The status bar + area header already carry the readout, and Blender's own `transform.*` HUD covers the Move/Scale/Rotate gizmos; the only gap was the Select tool's free-drag, judged not worth the redraw-scope cost for what the header text already shows |
+| 5 | Animated tilt on surface align | **Declined** 2026-08-27 — not being built. Roblox Studio itself tips a part near-instantly, so the current instant flip isn't a fidelity gap, just cosmetic polish nobody asked for |
+| 6 | Per-object "collidable" filtering | **Built** 2026-08-27 |
 
 ---
 
@@ -81,19 +85,6 @@ rather than at the next restart.
 *Impact:* low. Still **on by default**, so a Blender user who installs
 the addon loses their `Ctrl+1..4` subdivision shortcuts until they find the
 preference. Whether that default should flip is a judgement call, not a bug.
-
-### The 15° rotate increment is not restored on unregister
-
-`scene_state._set_default_rotate_increment` now only touches scenes still
-sitting on Blender's own default (0.0872665 rad = 5°), so a user's own
-increment survives an addon enable. The deferred timer is unregistered in
-`unregister()`.
-
-**Still true:** disabling the addon leaves the 15° value behind rather than
-reverting to 5°, and it applies to every scene in the file rather than just the
-active one.
-
-*Impact:* low.
 
 ### Sheared objects get a non-orthogonal gizmo basis
 
@@ -171,9 +162,6 @@ broader than it needs to be.
   been checked. `use_snap_translate` / `_rotate` / `_scale` and
   `POINT_UNIFORM_COLOR` are further 4.0 unknowns introduced by the 2026-08-25
   pass.
-- **Cross-keymap precedence** for the `Q` and `W` bindings (Object Mode vs
-  Window vs 3D View). Which keymap each binding lives in was enumerated; the
-  resolution rule between different keymaps was not independently confirmed.
 - **No automated tests exist.** `core/snapping.py`, `core/bounds.py`,
   `core/view_math.py`, and `drag._drag_roots` / `_signed_axes` are
   `bpy.ops`-free and would be the natural place to start.
@@ -204,3 +192,20 @@ measurements behind each is in `PROJECT_NOTES.md`.
 | An unselectable object under the press ate the click | Treated as a miss; a refused drag falls back to box-select |
 | `roblox_tools.zip` shipped a dragger-less addon | Deleted |
 | The Blender install was a stale copy of the repo | Directory junction |
+
+---
+
+## 11.7 Closed since the 2026-08-25 pass
+
+Full reasoning in `PROJECT_NOTES.md`'s 2026-08-26/27 entries.
+
+| Was | Now |
+| --- | --- |
+| Disabling the addon left the 15° rotate increment behind instead of reverting to 5° | Only the scenes actually nudged are reverted, and only if still exactly 15° — fixed 2026-08-26 |
+| Move worked in Edit Mesh; Scale and Rotate were Object Mode only | Both extended to Edit Mesh the same way — a second `WorkSpaceTool` class per tool, one per context mode — 2026-08-27 |
+| Rotate's Edit Mesh ring radii had no per-object `bound_box` to size from | `bounds.local_aabb_corners` reconstructs corners from the selection's own local AABB instead |
+| Move gizmo handles recomputed `matrix_basis` every redraw, including mid-drag | Skipped while `gz.is_modal`, so Blender's own interactive placement isn't fought — fixes jitter now that Edit Mesh dragging re-derives the pivot live |
+| Edit Mesh gizmos (all three tools) stayed visible with a stale transform after deselecting everything | Each gizmo group now sets `gz.hide` explicitly on both the empty-selection and normal paths |
+| No way to exclude an object from the dragger's collision/snap targets | `Collidable` custom Boolean property, read by `DragScene.candidates` — absent means collidable, matching Roblox's `CanCollide` default |
+| `Q`/`W`/`E`/`R` tool-switch shortcuts shadowed Blender's own bindings in Object Mode | Dropped entirely; only `Ctrl+1..4` remain |
+| `blf`/`gpu` HUD and animated surface-align tilt (Tiers 4–5) | Declined — not being built, see §11.2 |
