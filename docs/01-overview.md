@@ -3,7 +3,8 @@
 ## What RoTools is
 
 RoTools is a Blender addon (`roblox_tools/`) that adds four toolbar tools to
-the 3D Viewport in Object Mode:
+the 3D Viewport. Move, Scale, and Rotate work in both Object Mode and Edit
+Mesh (on vertex/edge/face selections); Select is Object Mode only:
 
 | Toolbar tool | `bl_idname` | Gizmo | What it does |
 | --- | --- | --- | --- |
@@ -14,7 +15,7 @@ the 3D Viewport in Object Mode:
 
 The addon does **not** replace Blender's own tools; it registers alongside
 them, inserted after `builtin.select_box` in the toolbar
-(`roblox_tools/tools/select_tool.py:49`).
+(`roblox_tools/tools/select_tool.py:61`).
 
 ## The design premise
 
@@ -46,13 +47,15 @@ this addon deliberately reproduces:
 | Scale tool handles | `ROTOOLS_GGT_scale` boxes | `GIZMO_GT_arrow_3d` (BOX style) → `transform.resize` |
 | Rotate tool rings | `ROTOOLS_GGT_rotate` dials | `GIZMO_GT_dial_3d` → `transform.rotate` |
 | 1 stud | 1 Blender unit | `rotools_drag_grid_size` default `1.0` |
-| Move increment (studs) | `rotools_drag_grid_size` | `core/scene_state.py:35` |
-| Rotate increment (15°) | `snap_angle_increment_3d` | `core/scene_state.py:74` |
-| Baseplate | Synthetic infinite ground plane | `core/snapping.py:160` |
-| Surface alignment on drop | `rotools_drag_surface_align` | `operators/drag.py:176` |
+| Move increment (studs) | `rotools_drag_grid_size` | `core/scene_state.py:165` |
+| Rotate increment (15°) | `snap_angle_increment_3d` | `core/scene_state.py:55` (`ROBLOX_ANGLE_INCREMENT`) |
+| Baseplate | Synthetic infinite ground plane | `core/snapping.py:170` |
+| Surface alignment on drop | `rotools_drag_surface_align` | `operators/drag.py:211` |
 | World / Local space toggle (Ctrl+L, any tool) | `rotools_orientation` | `operators/toggle_orientation.py` |
 | Pivot from a picked vertex / edge / face | `rotools_pivot_mode = 'SWIVEL'` | `operators/set_swivel.py`, `core/picking.py` |
 | Ctrl+1/2/3/4 tool shortcuts | Same bindings | `core/keymaps.py:17-20` |
+| Ctrl+D duplicate | `rotools.duplicate` | `operators/duplicate.py` |
+| `CanCollide` | `Collidable` custom Boolean property | `core/snapping.py:DragScene.candidates` |
 
 ## Feature matrix
 
@@ -69,13 +72,13 @@ this addon deliberately reproduces:
 | Shift = invert snapping, Alt = keep orientation | ✅ | Per-frame override, never written to scene state |
 | Status-bar key hints + live snap readout | ✅ | `workspace.status_text_set` with a callable |
 | Move / Scale / Rotate gizmos | ✅ | Delegate to Blender's `transform.*` operators |
-| Global / Local orientation for Move | ✅ | Ctrl+L while the Move tool is active |
+| Global / Local orientation, shared across every tool | ✅ | Ctrl+L, `rotools_orientation` |
+| Center / Origin / Swivel pivot, shared across every tool | ✅ | Ctrl+Shift+L, `rotools_pivot_mode` |
 | Opposite-face vs Centre scale pivot | ✅ | `rotools_scale_pivot` |
-| Ctrl+D drag-stamp duplication | ❌ | Tier 3, not started |
-| `blf` / `gpu` on-canvas HUD | ❌ | Tier 4, not started |
-| Animated tilt on surface align | ❌ | Tier 5, not started |
-| Per-object "collidable" filtering | ❌ | Tier 6, not started |
-| A `ui/` panel package | ❌ | Referenced by `CLAUDE.md` but absent — see [11](11-known-gaps.md) |
+| Ctrl+D drag-stamp duplication | ✅ | `operators/duplicate.py` |
+| Move / Scale / Rotate in Edit Mesh (vertex/edge/face selections) | ✅ | Gizmo-only — `rotools.select`'s body-click drag stays Object Mode |
+| Per-object "collidable" filtering | ✅ | `Collidable` custom property on an object, read by `DragScene.candidates` |
+| `ui/` package | ✅ | `ui/tool_ui.py` (shared tool-settings rows) + `ui/overlay.py` (viewport draw handler) — no `bpy.types.Panel`, by design |
 
 ## Compatibility
 
@@ -83,8 +86,8 @@ this addon deliberately reproduces:
 | --- | --- |
 | `bl_info["blender"]` (declared minimum) | `(4, 0, 0)` |
 | Verified against | Blender **5.2.0 LTS**, Python 3.13 |
-| Addon version | `(0, 1, 0)` |
-| Context mode | Object Mode only (`bl_context_mode = 'OBJECT'` on all four tools) |
+| Addon version | `(0, 3, 0)` |
+| Context mode | Object Mode (all four tools) + Edit Mesh (Move, Scale, Rotate — two `WorkSpaceTool` classes per tool, one per mode, sharing one `bl_idname`) |
 | Space | `VIEW_3D` |
 
 The declared 4.0 minimum has **not** been tested; every runtime confirmation in
@@ -92,17 +95,23 @@ these docs was made on 5.2.0 LTS. See [11-known-gaps.md](11-known-gaps.md).
 
 ## Scale of the codebase
 
-23 Python files, ~1,480 lines total. The two largest modules are the ones
-carrying the novel behaviour:
+30 Python files (5 empty `__init__.py`), ~3,000 lines total. The largest
+modules are the ones carrying the novel behaviour:
 
 ```
-operators/drag.py      295   free-drag operator (placement + modal loop)
-core/snapping.py       231   collision + snap engine
-gizmos/scale_gizmo.py  104   opposite-face scale handles
-core/bounds.py          89   AABB math shared by gizmos and the dragger
-operators/select.py    103   click / box-select / drag routing
-core/scene_state.py     87   scene-level properties
-gizmos/move_gizmo.py    87
-gizmos/rotate_gizmo.py  79
-core/view_math.py       51   screen ↔ world conversion
+operators/drag.py       412   free-drag operator (placement + modal loop)
+core/scene_state.py     252   scene-level properties
+core/snapping.py        240   collision + snap engine
+ui/overlay.py           195   viewport draw handler (swivel marker + HUD text)
+core/bounds.py          164   AABB math shared by gizmos and the dragger
+operators/set_swivel.py 162   picked-element pivot operator
+gizmos/rotate_gizmo.py  145   dial rings, per-ring radius
+gizmos/move_gizmo.py    140   axis arrows + centre ring
+gizmos/scale_gizmo.py   128   opposite-face scale handles
+core/picking.py         123   vertex/edge/face picker under the cursor
+core/pivot.py           111   shared Center/Origin/Swivel resolution
+operators/select.py     111   click / box-select / drag routing
+core/preferences.py     103   addon preferences
+operators/duplicate.py   89   Ctrl+D drag-stamp duplication
+core/view_math.py        51   screen ↔ world conversion
 ```
