@@ -12,7 +12,7 @@ point nowhere near the handles that are drawn. Forcing it in every mode keeps
 import bpy
 from mathutils import Matrix
 
-from ..core.bounds import AXIS_INDEX, aabb_center, local_aabb, point_from_local
+from ..core.bounds import AXIS_INDEX, aabb_center, edit_mesh_local_aabb, local_aabb, point_from_local
 from ..core.pivot import pivot_point, swivel_point, transform_objects
 from ..core.gizmo_common import (
     AXIS_COLORS,
@@ -37,6 +37,8 @@ class ROTOOLS_GGT_scale(bpy.types.GizmoGroup):
 
     @classmethod
     def poll(cls, context):
+        if context.mode == 'EDIT_MESH':
+            return bool(context.objects_in_mode)
         return context.mode == 'OBJECT' and context.selected_objects
 
     def _make_axis_gizmo(self, axis, sign):
@@ -61,12 +63,24 @@ class ROTOOLS_GGT_scale(bpy.types.GizmoGroup):
         }
 
     def draw_prepare(self, context):
-        objects = transform_objects(context)
-        if not objects:
-            return
-
         rotation_3x3, axis_rotations, orient_type = orientation_frame(context)
-        mins, maxs = local_aabb(objects, rotation_3x3)
+
+        if context.mode == 'EDIT_MESH':
+            aabb = edit_mesh_local_aabb(context, rotation_3x3)
+        else:
+            objects = transform_objects(context)
+            aabb = local_aabb(objects, rotation_3x3) if objects else None
+        if aabb is None:
+            # poll() only gates on there being an object in Edit Mesh, not on
+            # anything actually being selected within it - so a selection of
+            # zero verts still leaves the group running, and without this the
+            # handles would keep drawing at their last (now stale) position.
+            for gz in self.axis_gizmos.values():
+                gz.hide = True
+            return
+        for gz in self.axis_gizmos.values():
+            gz.hide = False
+        mins, maxs = aabb
         mid = aabb_center(mins, maxs)
         bounds = {1: maxs, -1: mins}
 

@@ -100,6 +100,14 @@ class DragScene:
     Built once per drag. `dragged` objects are excluded from every query, which
     is why the dragger cannot use `scene.ray_cast` for its per-frame drop
     target: that has no way to ignore the geometry currently under the cursor.
+
+    An object opts out of being a collision/snap target with a `Collidable`
+    custom property (Object Properties / N-panel > Custom Properties > New >
+    Boolean) set to False - deliberately a raw ID property rather than a
+    registered bpy.props.BoolProperty, so there is no addon-owned UI or
+    register/unregister to maintain; Blender's own Custom Properties panel is
+    the whole interface. Absent means collidable, matching Roblox's own
+    CanCollide default.
     """
 
     def __init__(self, context, dragged, use_ground=True, ground_z=0.0):
@@ -113,6 +121,7 @@ class DragScene:
             if obj.type == 'MESH'
             and obj.name not in dragged_names
             and obj.visible_get()
+            and obj.get("Collidable", True)
         ]
 
         self._aabbs = {}

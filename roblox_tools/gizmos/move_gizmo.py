@@ -82,7 +82,17 @@ class ROTOOLS_GGT_move(bpy.types.GizmoGroup):
         rotation_3x3, axis_rotations, orient_type = orientation_frame(context)
         pivot = pivot_point(context, rotation_3x3)
         if pivot is None:
+            # poll() only gates on there being an object in Edit Mesh, not on
+            # anything actually being selected within it - so a selection of
+            # zero verts still leaves the group running, and without this the
+            # handles would keep drawing at their last (now stale) position.
+            for gz in self.axis_gizmos.values():
+                gz.hide = True
+            self.center_gizmo.hide = True
             return
+        for gz in self.axis_gizmos.values():
+            gz.hide = False
+        self.center_gizmo.hide = False
 
         # In SWIVEL mode the arrows radiate from the picked point - the whole
         # point of setting a swivel is to work from it. Otherwise they sit on
@@ -109,10 +119,11 @@ class ROTOOLS_GGT_move(bpy.types.GizmoGroup):
 
         for (axis, sign), gz in self.axis_gizmos.items():
             self.axis_ops[(axis, sign)].orient_type = orient_type
-            # Recomputed every redraw, including while gz.is_modal - the arrow's
-            # own built-in interactive offset isn't Shift-precision-aware, so
-            # tracking the live (already-correctly-slowed) object here is what
-            # keeps the drawn handle in sync with the object during a Shift-drag.
+            if gz.is_modal:
+                # Leave a handle's own matrix alone while it is being dragged -
+                # Blender is already driving it interactively, and overwriting
+                # matrix_basis out from under that fights the drag.
+                continue
             position = pivot if face_positions is None else face_positions[(axis, sign)]
             rot = axis_rotations[axis] if sign == 1 else axis_rotations[axis] @ FLIP_ROTATION
             gz.matrix_basis = Matrix.Translation(position) @ rot

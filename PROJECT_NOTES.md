@@ -4,6 +4,109 @@ Running log of decisions, gotchas, and in-progress work for RoTools. Newest
 entries at the top. This is the project's persistent memory since there is
 no git history to consult.
 
+## 2026-08-27 — Edit Mesh support, v2: Scale and Rotate
+
+Extends the 2026-08-26 Move-only Edit Mesh v1 scope to the other two
+transform tools, following the same pattern rather than inventing a new one.
+
+**`tools/scale_tool.py` and `tools/rotate_tool.py` each gained an `_edit`
+`WorkSpaceTool` subclass**, `bl_context_mode = 'EDIT_MESH'` sharing the
+original's `bl_idname`, registered alongside the Object Mode class — exactly
+`ROTOOLS_WT_move_edit`'s shape in `tools/move_tool.py`, for the same reason
+(`bl_context_mode` is a plain dict key, so one class cannot cover two modes).
+Both files also deduplicated their `bl_description`/`bl_keymap` into a
+module-level `DESCRIPTION`/`KEYMAP` plus a shared `_draw_settings` function,
+since the Object and Edit Mesh classes would otherwise carry byte-identical
+copies. `rotools.set_swivel` and `rotools.duplicate` stay in the Edit Mesh
+keymaps even though their `poll()`s remain Object-Mode-only — same precedent
+as `ROTOOLS_WT_move_edit`'s duplicate binding: an inactive keymap entry until
+those operators grow Edit Mesh support of their own.
+
+**`gizmos/scale_gizmo.py` and `gizmos/rotate_gizmo.py`** gained the same
+`poll()`/`draw_prepare` EDIT_MESH branches `move_gizmo.py` already had:
+`poll` accepts `EDIT_MESH` when `context.objects_in_mode` is non-empty, and
+`draw_prepare` sources its box (Scale) or ring radii (Rotate) from
+`edit_mesh_local_aabb` instead of `local_aabb`/`world_corners` when in that
+mode.
+
+**Rotate's ring radius formula needed a real replacement for `world_corners`,
+not just a mode switch.** The 2026-08-25 sizing fix (see that entry) measures
+each ring's radius from the *part's own* oriented corners, specifically
+because an AABB swells as it turns. But a bmesh selection has no per-object
+`bound_box` to take those corners from — it is a loose point cloud, not a
+part with a fixed shape. `core/bounds.py` gained
+`local_aabb_corners(rotation_3x3, mins, maxs)`, the 8 corners of the
+`local_aabb`-frame box itself (reconstructed via the existing
+`point_from_local`), used as the stand-in. This is a weaker invariant than
+the Object Mode case — the local AABB can still swell as the selection turns,
+unlike a rigid part's own corners — but it is the closest available substitute
+and matches what Scale already does for its own box handles in Edit Mesh.
+
+**`gizmos/move_gizmo.py` also stopped recomputing a handle's `matrix_basis`
+while `gz.is_modal`.** The previous comment justified recomputing every
+redraw, modal included, as tracking a Shift-slowed drag that the arrow
+gizmo's own interactive offset doesn't know about. That still holds in Object
+Mode, where the pivot only moves through the operator's own transform. In
+Edit Mesh, `pivot_point` is re-derived from `bmesh_selected_corners` every
+call, and `transform.translate` mutates those vertex positions live during
+the drag — so recomputing `matrix_basis` from the pivot mid-drag was
+computing it from a position the drag itself had already moved, fighting
+Blender's own interactive placement of the handle being dragged. Skipping the
+overwrite while modal leaves Blender fully in charge of a handle's transform
+for the duration of its own drag, in both modes.
+
+**Not yet manually verified in the live viewport** — same category as the
+rest of the Edit Mesh work: no way to simulate viewport mouse input through
+this session's tooling. Needs a human at the keyboard: dragging Scale's six
+handles and Rotate's three rings on a real vert/edge/face selection, and
+confirming Move's handles no longer jitter mid-drag in either mode.
+
+## 2026-08-27 — Per-object "Collidable" toggle for the dragger
+
+Closes the "per-object collidable filtering" gap left open in the
+2026-08-24 dragger entry below. `DragScene.candidates`
+(`core/snapping.py`) now drops any object whose `Collidable` custom
+property is set to `False`, gating both `ray_cast` (flush resting) and
+`nearest_features` (soft snap) in one place — the two are already fed by
+the same `candidates` list, so nothing else needed to change.
+
+**Deliberately a raw ID property (`obj.get("Collidable", True)`), not a
+registered `bpy.props.BoolProperty`.** The user asked for it this way:
+Blender's own Custom Properties panel (Object Properties / N-panel Item
+tab, bottom of the list) already supports a Boolean type with no addon
+code, so this needed neither a `scene_state.py`-style register/unregister
+pair nor any new `draw_settings` row — the property just doesn't exist
+until a user adds one via `New > Boolean`, at which point `obj.get(...,
+True)` picks it up. Absent means collidable, matching Roblox's own
+`CanCollide` default. Tradeoff: no addon-provided way to bulk-add the
+property or see its state without opening Object Properties; not asked
+for, so not built.
+
+## 2026-08-27 — Fixed: Edit Mesh gizmos stuck visible with nothing selected
+
+**Bug report:** in Edit Mesh, with a RoTools tool equipped and nothing
+selected, the gizmo (arrows/rings/handles) stayed visible instead of
+hiding — including after switching to a different tool.
+
+**Root cause**, found by reading (not live-poking, per the user's
+correction mid-session): the three gizmo groups' `poll()` classmethods gate
+Edit Mesh on `bool(context.objects_in_mode)` — is *an object* being edited —
+not on whether anything is actually selected *within* it. So deselecting all
+verts/edges/faces leaves `poll()` returning `True`, and the group keeps
+running. But each group's `draw_prepare()` only handled the "nothing
+selected" case with an early `return` when `pivot_point()` (move/rotate) or
+`edit_mesh_local_aabb()` (scale) came back `None` — skipping the handles'
+reposition instead of hiding them, so they stayed drawn at their last
+computed (now stale) transform.
+
+**Fix:** `gizmos/move_gizmo.py`, `gizmos/scale_gizmo.py`,
+`gizmos/rotate_gizmo.py` now set `gz.hide = True` on every owned gizmo in
+that early-return branch, and `gz.hide = False` on the normal path.
+`bpy.types.Gizmo.hide` confirmed as a real bool property via the bundled API
+docs before use. Not yet manually verified in the live viewport (needs a
+human at the keyboard, same category as the rest of the Edit Mesh work
+below).
+
 ## 2026-08-27 — Removed the Q/W/E/R tool-switch shortcuts
 
 **Dropped the `Q`/`W`/`E`/`R` bindings from `core/keymaps.py`'s `BINDINGS`

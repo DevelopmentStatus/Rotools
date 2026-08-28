@@ -114,6 +114,22 @@ def aabb_corners(mins, maxs):
     ]
 
 
+def local_aabb_corners(rotation_3x3, mins, maxs):
+    """The 8 corners of a `local_aabb`-frame box, reconstructed in world space.
+
+    What `world_corners` is for an object's own oriented bound_box: the rotate
+    gizmo's Edit Mesh ring radii have no such per-object box to fall back on (a
+    bmesh selection is a loose point cloud, not a part with a fixed shape), so
+    the local AABB's own corners stand in for it.
+    """
+    return [
+        point_from_local(rotation_3x3, x, y, z)
+        for x in (mins[0], maxs[0])
+        for y in (mins[1], maxs[1])
+        for z in (mins[2], maxs[2])
+    ]
+
+
 def aabb_overlap(min_a, max_a, min_b, max_b):
     """True when two world-axis-aligned boxes intersect. Broad-phase reject."""
     for i in range(3):

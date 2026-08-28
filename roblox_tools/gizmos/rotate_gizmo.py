@@ -18,7 +18,7 @@ while they are being dragged.
 import bpy
 from mathutils import Matrix
 
-from ..core.bounds import axis_vectors, world_corners
+from ..core.bounds import axis_vectors, edit_mesh_local_aabb, local_aabb_corners, world_corners
 from ..core.pivot import pivot_point, transform_objects
 from ..core.gizmo_common import (
     AXIS_COLORS,
@@ -46,6 +46,8 @@ class ROTOOLS_GGT_rotate(bpy.types.GizmoGroup):
 
     @classmethod
     def poll(cls, context):
+        if context.mode == 'EDIT_MESH':
+            return bool(context.objects_in_mode)
         return context.mode == 'OBJECT' and context.selected_objects
 
     def _make_ring_gizmo(self, axis):
@@ -70,10 +72,17 @@ class ROTOOLS_GGT_rotate(bpy.types.GizmoGroup):
         rotation_3x3, axis_rotations, orient_type = orientation_frame(context)
         pivot = pivot_point(context, rotation_3x3)
         if pivot is None:
+            # poll() only gates on there being an object in Edit Mesh, not on
+            # anything actually being selected within it - so a selection of
+            # zero verts still leaves the group running, and without this the
+            # rings would keep drawing at their last (now stale) position.
+            for gz in self.ring_gizmos.values():
+                gz.hide = True
             return
 
         radii = self._radii(context, rotation_3x3, pivot)
         for axis, gz in self.ring_gizmos.items():
+            gz.hide = False
             gz.scale_basis = radii[axis]
             gz.matrix_basis = Matrix.Translation(pivot) @ axis_rotations[axis]
             op = self.ring_ops[axis]
@@ -99,14 +108,22 @@ class ROTOOLS_GGT_rotate(bpy.types.GizmoGroup):
         an axis-aligned box fitted around it. An AABB grows as its contents
         turn - measured that way this same formula made the ring swell ~40% at
         45 degrees and shrink back by 90.
+
+        Edit Mesh is the one exception: a bmesh selection has no fixed "part
+        shape" the way an object's bound_box does, so its own local AABB
+        corners (`local_aabb_corners`) are the closest thing available and are
+        used as-is.
         """
-        objects = transform_objects(context)
-        if not objects:
-            return {axis: MIN_RADIUS for axis in 'XYZ'}
+        if context.mode == 'EDIT_MESH':
+            aabb = edit_mesh_local_aabb(context, rotation_3x3)
+            corners = local_aabb_corners(rotation_3x3, *aabb) if aabb is not None else []
+        else:
+            objects = transform_objects(context)
+            corners = world_corners(objects) if objects else []
 
         axes = axis_vectors(rotation_3x3)
         furthest = dict.fromkeys('XYZ', 0.0)
-        for corner in world_corners(objects):
+        for corner in corners:
             offset = corner - pivot
             for axis, (u, v) in PLANE_AXES.items():
                 # Squared, to keep one sqrt per ring rather than one per corner.
